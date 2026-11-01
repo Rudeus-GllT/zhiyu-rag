@@ -1,0 +1,46 @@
+# secrets / local config
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# runtime data
+data/
+uploads/
+extracted/
+chroma/
+*.db
+*.db-shm
+*.db-wal
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+.venv/
+venv/
+.envrc
+.pytest_cache/
+.pytest-cache-files-*/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# local dependencies
+vendor/
+node_modules/
+
+# editors / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# local scratch
+*.tmp
+*.bak
+
+jieba.cache

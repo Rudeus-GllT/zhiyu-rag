@@ -1,0 +1,11 @@
+{"id":"q1","question":"混合检索是怎么做融合的？","ground_truth":"对向量检索和 BM25 检索的排名使用 Reciprocal Rank Fusion（RRF）融合，向量通道权重 1.0，BM25 通道权重 0.85，k 默认 60。","relevant_sources":[{"doc_name":"03-混合检索与重排.md","evidence":"Reciprocal Rank Fusion"}]}
+{"id":"q2","question":"扫描版 PDF 是如何解析的？","ground_truth":"先判断页面文本长度，少于 40 字时按 2 倍分辨率渲染成 PNG，再交给 OCR 或 VLM 提取文字和语义信息。","relevant_sources":[{"doc_name":"02-多模态文档解析.md","evidence":"文本长度少于 40 字"}]}
+{"id":"q3","question":"增量索引如何判断文档需要更新？","ground_truth":"用文档原始字节的 SHA-256 与已索引文档比较；相同则跳过，不同则重新解析、切块、嵌入并提升索引版本。","relevant_sources":[{"doc_name":"04-增量索引与缓存.md","evidence":"SHA-256"}]}
+{"id":"q4","question":"Chroma 和 BM25 各适合什么场景？","ground_truth":"稠密向量检索擅长语义相似，BM25 擅长专有名词和精确匹配；两者通过 RRF 融合互补。","relevant_sources":[{"doc_name":"03-混合检索与重排.md","evidence":"BM25 擅长精确匹配"}]}
+{"id":"q5","question":"语义缓存如何避免索引更新后返回旧答案？","ground_truth":"索引版本是所有缓存的命名空间，语义缓存按 version 字段过滤，版本变化后旧缓存不会被召回。","relevant_sources":[{"doc_name":"04-增量索引与缓存.md","evidence":"按 version 字段过滤"}]}
+{"id":"q6","question":"引用核查如何判断一句话是否被原文支持？","ground_truth":"计算句子与所引 chunk 的词元覆盖率，覆盖率超过 0.24 或命中引号原文即判定为支持，同时统计 coverage 和 accuracy。","relevant_sources":[{"doc_name":"03-混合检索与重排.md","evidence":"覆盖率超过 0.24"}]}
+{"id":"q7","question":"Hit@5 和 MRR 分别衡量什么？","ground_truth":"Hit@5 衡量前 5 个结果中是否至少有一个相关片段；MRR 是第一个相关片段排名的倒数，衡量排序质量。","relevant_sources":[{"doc_name":"05-评测与调优.md","evidence":"第一个相关片段排名的倒数"}]}
+{"id":"q9","question":"总结一下多模态 RAG 的离线索引流程","ground_truth":"离线链路为解析、清洗、切块、绑定元数据、向量化、建索引：PDF/Markdown/图片等由对应 loader 解析，清洗后按 section 和 720 字符切块，同时写入 Chroma 与 BM25。","relevant_sources":[{"doc_name":"01-RAG系统总览.md","evidence":"离线索引的标准流程"},{"doc_name":"02-多模态文档解析.md","evidence":"RapidOCR"}]}
+{"id":"q10","question":"图片解析有哪些回退方案？","ground_truth":"依次尝试 RapidOCR、Tesseract、VLM、图片同名 sidecar 说明文件，最后才用文件名兜底。","relevant_sources":[{"doc_name":"02-多模态文档解析.md","evidence":"Sidecar 说明"}]}
+{"id":"q11","question":"为什么需要低置信度二次检索？","ground_truth":"当检索置信度低于 0.34 或生成后综合置信度低于 0.46 时，用 HyDE 扩大召回并重新生成，以提升召回效果和回答质量。","relevant_sources":[{"doc_name":"03-混合检索与重排.md","evidence":"检索置信度低于 0.34"}]}
+{"id":"q12","question":"PDF 速览里提到的默认检索参数有哪些？","ground_truth":"chunk_size 720、chunk_overlap 120、dense_top_k 14、bm25_top_k 14、rerank_top_n 6。","relevant_sources":[{"doc_name":"多模态RAG架构速览.pdf","evidence":"dense_top_k"}]}

@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="知屿 · 面向个人的多模态 RAG 知识库智能体">
+  <title>知屿 · 个人多模态知识库</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/styles.css?v=1.1.0-maid2">
+  <script>
+    // Apply the saved theme before first paint so a reload does not flash.
+    try {
+      var savedTheme = localStorage.getItem('zhiyu.theme');
+      if (savedTheme === 'alice' || savedTheme === 'big-fish') {
+        document.documentElement.dataset.theme = savedTheme;
+      }
+    } catch (error) {}
+  </script>
+</head>
+<body>
+  <div class="ambient ambient-a"></div>
+  <div class="ambient ambient-b"></div>
+
+  <div class="app-shell">
+    <aside class="rail" id="rail">
+      <div class="brand">
+        <div class="brand-mark">知</div>
+        <div class="brand-copy">
+          <strong>知屿</strong>
+          <span>个人多模态知识库</span>
+        </div>
+      </div>
+
+      <nav class="rail-nav" aria-label="主导航">
+        <button class="nav-item active" data-view="chat">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5h16v10H9l-5 4v-14Z"/><path d="M8 9h8M8 12h5"/></svg>
+          <span>对话</span><em>Ask</em>
+        </button>
+        <button class="nav-item" data-view="library">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h5v16H5zM12 4h7v16h-7z"/><path d="M7 8h1M14 8h3M14 12h3"/></svg>
+          <span>知识库</span><em>Library</em>
+        </button>
+        <button class="nav-item" data-view="eval">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16M6 16V9M11 16V5M16 16v-4M21 16v-7"/></svg>
+          <span>评测</span><em>Eval</em>
+        </button>
+        <button class="nav-item" data-view="system">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9 7 7M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/></svg>
+          <span>系统</span><em>System</em>
+        </button>
+      </nav>
+
+      <div class="rail-block">
+        <div class="rail-block-head">
+          <span>最近对话</span>
+          <button id="new-chat" class="mini-btn" title="新建对话" aria-label="新建对话">+</button>
+        </div>
+        <div id="session-list" class="session-list"></div>
+      </div>
+
+      <div class="rail-foot">
+        <div class="provider">
+          <span class="status-dot" id="status-dot"></span>
+          <div>
+            <strong id="provider-name">正在连接…</strong>
+            <span id="provider-sub">本地知识库</span>
+          </div>
+        </div>
+        <a class="api-link" href="/docs" target="_blank" rel="noreferrer">API 文档 <span>↗</span></a>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <button class="icon-btn mobile-only" id="menu-toggle" aria-label="打开菜单">
+          <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+        </button>
+        <div class="crumb">
+          <span id="view-eyebrow">WORKSPACE</span>
+          <h1 id="view-title">对话</h1>
+        </div>
+        <div class="topbar-actions">
+          <span class="pill"><i class="pill-dot"></i>索引 v<span id="index-version">—</span></span>
+          <span class="pill muted" id="cache-pill">缓存 —</span>
+          <button class="btn ghost small" id="trace-toggle">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h7"/><circle cx="18" cy="12" r="2"/><circle cx="14" cy="18" r="2"/></svg>
+            检索轨迹
+          </button>
+        </div>
+      </header>
+
+      <!-- ============================ CHAT ============================ -->
+      <section id="view-chat" class="view active">
+        <div class="chat-column">
+          <div class="chat-stream" id="chat-stream">
+            <div class="hero" id="hero">
+              <span class="eyebrow">PERSONAL KNOWLEDGE OS</span>
+              <h2>把散落的资料，<br><em>变成可对话的知识。</em></h2>
+              <p class="hero-sub">PDF、Markdown、截图与笔记，统一解析为可检索的片段。每一次回答都带来源编号，每一句引用都可以核查。</p>
+              <div class="hero-stats">
+                <div class="hero-stat"><strong id="hero-docs">—</strong><span>篇资料</span></div>
+                <div class="hero-stat"><strong id="hero-chunks">—</strong><span>个知识片段</span></div>
+                <div class="hero-stat"><strong id="hero-version">—</strong><span>当前索引版本</span></div>
+              </div>
+              <div class="hero-notes">
+                <span>多路召回</span><i></i><span>RRF 融合</span><i></i><span>引用核查</span><i></i><span>语义缓存</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="composer-area">
+            <div class="suggest-row" id="suggestions"></div>
+            <form id="composer" class="composer">
+              <textarea id="message-input" rows="1" placeholder="问点什么…… 例如：混合检索是怎么做融合的？" aria-label="输入问题"></textarea>
+              <div class="composer-bar">
+                <div class="composer-left">
+                  <button type="button" class="text-btn" id="attach-btn" title="上传资料">
+                    <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+                    资料
+                  </button>
+                  <label class="select-wrap">
+                    <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"/><path d="M8 9h8M8 13h5"/></svg>
+                    <select id="doc-filter" aria-label="限定检索范围">
+                      <option value="">全库检索</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="composer-right">
+                  <span class="kbd-hint">Enter 发送 · Shift + Enter 换行</span>
+                  <button type="submit" class="send-btn" id="send-btn" aria-label="发送">
+                    <svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg>
+                  </button>
+                </div>
+              </div>
+            </form>
+            <p class="disclaimer">知屿只依据知识库资料作答，并标注 [编号] 来源；引用核查会标记缺少原文支持的句子。</p>
+          </div>
+        </div>
+
+        <aside class="trace-panel" id="trace-panel">
+          <div class="trace-head">
+            <div>
+              <span class="eyebrow">PIPELINE</span>
+              <h3>检索轨迹</h3>
+            </div>
+            <button class="icon-btn" id="trace-close" aria-label="关闭检索轨迹">
+              <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>
+            </button>
+          </div>
+          <div class="trace-summary" id="trace-summary">
+            <div class="trace-empty">
+              <div class="trace-orbit"><span></span><span></span><span></span></div>
+              <p>发送一个问题，这里会展示查询改写、多路召回、重排、生成与引用核查的完整链路。</p>
+            </div>
+          </div>
+          <div class="timeline" id="trace-timeline"></div>
+          <div class="trace-sources" id="trace-sources"></div>
+        </aside>
+      </section>
+
+      <!-- =========================== LIBRARY =========================== -->
+      <section id="view-library" class="view">
+        <div class="page">
+          <div class="page-head">
+            <div>
+              <span class="eyebrow">KNOWLEDGE BASE</span>
+              <h2>你的资料，正在变成索引</h2>
+              <p>支持 PDF、Markdown、图片、文本与 DOCX。解析、清洗、切块与双索引在后台一次完成。</p>
+            </div>
+            <div class="page-actions">
+              <button class="btn ghost" id="repair-index">修复向量索引</button>
+              <button class="btn primary" id="upload-trigger">上传资料</button>
+              <input type="file" id="file-input" multiple hidden
+                     accept=".pdf,.md,.markdown,.txt,.png,.jpg,.jpeg,.webp,.gif,.docx,.csv,.json">
+            </div>
+          </div>
+
+          <div class="stat-grid">
+            <div class="stat-card"><span>文档</span><strong id="lib-docs">—</strong><small>篇已索引</small></div>
+            <div class="stat-card"><span>片段</span><strong id="lib-chunks">—</strong><small>个 chunk</small></div>
+            <div class="stat-card"><span>索引版本</span><strong id="lib-version">—</strong><small>内容变更即递增</small></div>
+            <div class="stat-card accent"><span>向量后端</span><strong id="lib-vector">—</strong><small id="lib-embedding">—</small></div>
+          </div>
+
+          <div class="dropzone" id="dropzone">
+            <div class="drop-icon">
+              <svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 15v4h16v-4"/></svg>
+            </div>
+            <div>
+              <strong>拖拽文件到这里，或点击上传</strong>
+              <span>PDF / Markdown / 图片 / TXT / DOCX · 单文件最大 30 MB</span>
+            </div>
+            <div class="drop-tags"><span>OCR</span><span>VLM</span><span>表格</span><span>增量同步</span></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h3>资料清单</h3>
+                <span id="doc-count-label">—</span>
+              </div>
+              <div class="panel-tools">
+                <div class="search-box">
+                  <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="m16 16 4 4"/></svg>
+                  <input id="doc-search" type="search" placeholder="搜索文档名">
+                </div>
+                <select id="doc-status-filter" class="filter-select">
+                  <option value="">全部状态</option>
+                  <option value="ready">就绪</option>
+                  <option value="error">失败</option>
+                </select>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table class="data-table" id="doc-table">
+                <thead>
+                  <tr><th>文档</th><th>类型</th><th>片段</th><th>大小</th><th>状态</th><th>更新时间</th><th></th></tr>
+                </thead>
+                <tbody id="doc-tbody"></tbody>
+              </table>
+              <div class="empty-state" id="doc-empty" hidden>
+                <p>还没有资料。上传第一篇 PDF 或 Markdown，开始构建你的知识库。</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="pipeline-strip">
+            <div><span>01</span><strong>解析</strong><small>PDF / MD / 图片 / OCR / VLM</small></div>
+            <i></i>
+            <div><span>02</span><strong>切块</strong><small>标题路径 + 页码 + 元数据</small></div>
+            <i></i>
+            <div><span>03</span><strong>双索引</strong><small>Chroma 向量 + BM25 稀疏</small></div>
+            <i></i>
+            <div><span>04</span><strong>可检索</strong><small>版本化、可修复、可评测</small></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================= EVAL ============================= -->
+      <section id="view-eval" class="view">
+        <div class="page">
+          <div class="page-head">
+            <div>
+              <span class="eyebrow">EVALUATION</span>
+              <h2>检索与生成，分开度量</h2>
+              <p>Hit / MRR / nDCG 衡量找得准不准，Faithfulness 与引用核查衡量答得稳不稳。</p>
+            </div>
+            <div class="page-actions eval-controls">
+              <label class="select-wrap dark">
+                <select id="dataset-select"></select>
+              </label>
+              <label class="select-wrap dark">
+                <select id="eval-limit">
+                  <option value="12">12 题</option>
+                  <option value="6">6 题</option>
+                  <option value="3">3 题</option>
+                </select>
+              </label>
+              <button class="btn primary" id="run-eval">开始评测</button>
+            </div>
+          </div>
+
+          <div class="eval-status" id="eval-status" hidden>
+            <div class="eval-progress"><span id="eval-progress-bar"></span></div>
+            <p id="eval-status-text">正在评测…</p>
+          </div>
+
+          <div class="metric-grid" id="metric-grid">
+            <div class="metric-card"><span>Hit@5</span><strong id="metric-hit">—</strong><small>前 5 条是否命中相关片段</small></div>
+            <div class="metric-card"><span>MRR@5</span><strong id="metric-mrr">—</strong><small>首个相关片段的排名</small></div>
+            <div class="metric-card"><span>Faithfulness</span><strong id="metric-faith">—</strong><small>引用被原文支持的比例</small></div>
+            <div class="metric-card"><span>p95 延迟</span><strong id="metric-latency">—</strong><small>端到端响应时间</small></div>
+          </div>
+
+          <div class="eval-layout">
+            <div class="panel">
+              <div class="panel-head">
+                <div><h3>逐题结果</h3><span id="eval-run-label">选择或运行一次评测</span></div>
+                <span class="pill muted" id="eval-run-status">—</span>
+              </div>
+              <div class="table-wrap">
+                <table class="data-table compact" id="case-table">
+                  <thead><tr><th>问题</th><th>Hit@5</th><th>MRR</th><th>Faith.</th><th>置信度</th><th>延迟</th></tr></thead>
+                  <tbody id="case-tbody"></tbody>
+                </table>
+                <div class="empty-state" id="eval-empty"><p>还没有评测运行。选择评测集，点击「开始评测」。</p></div>
+              </div>
+            </div>
+
+            <aside class="eval-aside">
+              <div class="panel soft">
+                <h3>历史运行</h3>
+                <div id="eval-history" class="history-list"></div>
+              </div>
+              <div class="panel soft">
+                <h3>指标口径</h3>
+                <dl class="metric-notes">
+                  <div><dt>Hit@5</dt><dd>前 5 个检索结果中至少一个与标注证据匹配。</dd></div>
+                  <div><dt>MRR@5</dt><dd>第一个相关结果排名倒数，越接近 1 越好。</dd></div>
+                  <div><dt>Faithfulness</dt><dd>引用核查通过率，未标注引用的断言会拉低覆盖。</dd></div>
+                  <div><dt>Context Precision</dt><dd>召回片段中真正相关的比例，反映噪声。</dd></div>
+                </dl>
+              </div>
+              <div class="panel soft">
+                <h3>评测集格式</h3>
+                <pre class="mini-code">{"question": "...",
+ "ground_truth": "...",
+ "relevant_sources": [
+   {"doc_name": "x.md",
+    "evidence": "原文短语"}
+ ]}</pre>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================ SYSTEM ============================ -->
+      <section id="view-system" class="view">
+        <div class="page system-page">
+          <div class="system-layout">
+            <aside class="system-menu" aria-label="系统菜单">
+              <div class="system-menu-head">
+                <span class="eyebrow">SYSTEM MENU</span>
+                <p>项目说明与界面偏好</p>
+              </div>
+              <button class="system-menu-item active" type="button" data-system-tab="intro" aria-current="page">
+                <span class="system-menu-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5z"/><path d="M4 5.5v16"/><path d="M8 7h8M8 11h6"/></svg>
+                </span>
+                <span class="system-menu-copy"><strong>项目介绍</strong><em>Overview</em></span>
+                <span class="system-menu-arrow" aria-hidden="true">→</span>
+              </button>
+              <button class="system-menu-item" type="button" data-system-tab="theme">
+                <span class="system-menu-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18c1.4 0 2.2-.9 2.2-2.1 0-1.2-.9-2.1-2.1-2.1h-1.2a2.2 2.2 0 0 1 0-4.4H15a3 3 0 0 0 3-3c0-3.4-2.7-6.4-6-6.4Z"/><circle cx="8" cy="9" r=".8"/><circle cx="12" cy="7" r=".8"/><circle cx="16" cy="9" r=".8"/></svg>
+                </span>
+                <span class="system-menu-copy"><strong>更换主题</strong><em>Appearance</em></span>
+                <span class="system-menu-arrow" aria-hidden="true">→</span>
+              </button>
+              <div class="system-menu-foot">
+                <span>当前主题</span>
+                <strong id="system-theme-name">默认 · 白绿渐变</strong>
+              </div>
+            </aside>
+
+            <div class="system-main">
+              <div class="system-pane active" data-system-pane="intro">
+                <div class="page-head">
+                  <div>
+                    <span class="eyebrow">SYSTEM</span>
+                    <h2>链路是透明的</h2>
+                    <p>模型、向量库、OCR/VLM、缓存与索引的实时状态。</p>
+                  </div>
+                  <div class="page-actions">
+                    <button class="btn ghost" id="clear-cache">清空缓存</button>
+                    <a class="btn ghost" href="/docs" target="_blank" rel="noreferrer">OpenAPI ↗</a>
+                  </div>
+                </div>
+
+                <div class="system-grid">
+                  <div class="panel">
+                    <div class="panel-head"><h3>模型与检索</h3><span class="pill" id="sys-mode">—</span></div>
+                    <div class="kv-list" id="sys-model-list"></div>
+                  </div>
+                  <div class="panel">
+                    <div class="panel-head"><h3>能力开关</h3><span class="pill muted">CAPABILITIES</span></div>
+                    <div class="feature-tags" id="sys-features"></div>
+                    <div class="kv-list" id="sys-index-list"></div>
+                  </div>
+                  <div class="panel">
+                    <div class="panel-head"><h3>检索参数</h3><span class="pill muted">TUNING</span></div>
+                    <div class="param-grid" id="sys-params"></div>
+                  </div>
+                  <div class="panel">
+                    <div class="panel-head"><h3>请求链路</h3><span class="pill muted">HTTP / SSE</span></div>
+                    <div class="endpoint-list" id="sys-endpoints">
+                      <div><code>POST</code><span>/api/v1/chat</span><em>同步问答</em></div>
+                      <div><code>POST</code><span>/api/v1/chat/stream</span><em>SSE 流式</em></div>
+                      <div><code>POST</code><span>/api/v1/documents/upload</span><em>多文件上传</em></div>
+                      <div><code>POST</code><span>/api/v1/eval/runs</span><em>启动评测</em></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="system-pane" data-system-pane="theme">
+                <div class="page-head">
+                  <div>
+                    <span class="eyebrow">APPEARANCE</span>
+                    <h2>换一种阅读气氛</h2>
+                    <p>主题只改变界面色调，不影响知识库、索引与问答结果。点击任意小窗即可切换，选择会保存在本机。</p>
+                  </div>
+                  <div class="page-actions">
+                    <span class="pill muted">3 套主题</span>
+                  </div>
+                </div>
+
+                <div class="theme-current-panel">
+                  <div class="theme-current-copy">
+                    <span class="eyebrow">CURRENT THEME</span>
+                    <h3 id="theme-current-title">默认 · 白绿渐变</h3>
+                    <p id="theme-current-desc">白色基底与青绿渐层，安静克制，适合长时间阅读。</p>
+                    <div class="theme-current-meta">
+                      <span class="pill" id="theme-current-pill">默认主题</span>
+                      <span class="theme-hint">预览区域暂为白色占位，主题视觉设计待补。</span>
+                    </div>
+                  </div>
+                  <div class="theme-preview theme-preview-large" aria-label="当前主题预览占位">
+                    <span class="theme-preview-label">THEME PREVIEW · WHITE PLACEHOLDER</span>
+                  </div>
+                </div>
+
+                <div class="theme-gallery">
+                  <button class="theme-option active" type="button" data-theme-id="default" aria-pressed="true">
+                    <span class="theme-option-head">
+                      <span class="theme-option-title"><strong>默认 · 白绿渐变</strong><em>Default</em></span>
+                      <span class="theme-option-check" aria-hidden="true">✓</span>
+                    </span>
+                    <span class="theme-window" aria-hidden="true">
+                      <span class="theme-window-bar"><i></i><i></i><i></i></span>
+                      <span class="theme-window-canvas"><span>PREVIEW</span></span>
+                    </span>
+                    <span class="theme-option-desc">白色基底与青绿渐层，安静克制，适合长时间阅读。</span>
+                  </button>
+                  <button class="theme-option" type="button" data-theme-id="alice" aria-pressed="false">
+                    <span class="theme-option-head">
+                      <span class="theme-option-title"><strong>艾莉丝</strong><em>Alice</em></span>
+                      <span class="theme-option-check" aria-hidden="true">✓</span>
+                    </span>
+                    <span class="theme-window" aria-hidden="true">
+                      <span class="theme-window-bar"><i></i><i></i><i></i></span>
+                      <span class="theme-window-canvas"><span>PREVIEW</span></span>
+                    </span>
+                    <span class="theme-option-desc">雾蓝与浅紫的柔和渐变，像一本带插画的夜读笔记。</span>
+                  </button>
+                  <button class="theme-option" type="button" data-theme-id="big-fish" aria-pressed="false">
+                    <span class="theme-option-head">
+                      <span class="theme-option-title"><strong>大肥鱼</strong><em>Big Fish · Atelier</em></span>
+                      <span class="theme-option-check" aria-hidden="true">✓</span>
+                    </span>
+                    <span class="theme-window" aria-hidden="true">
+                      <span class="theme-window-bar"><i></i><i></i><i></i></span>
+                      <span class="theme-window-canvas"><span>PREVIEW</span></span>
+                    </span>
+                    <span class="theme-option-desc">深海女仆工坊：深海蓝、陶瓷白与柔金，鲸鱼娘的蕾丝与玻璃质感。</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="toast" id="toast" role="status"></div>
+  <div class="modal-backdrop" id="modal-backdrop" hidden>
+    <div class="modal" role="dialog" aria-modal="true">
+      <h3 id="modal-title">确认</h3>
+      <p id="modal-text"></p>
+      <div class="modal-actions">
+        <button class="btn ghost" id="modal-cancel">取消</button>
+        <button class="btn danger" id="modal-confirm">确认</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js?v=1.1.0-maid2" defer></script>
+</body>
+</html>
